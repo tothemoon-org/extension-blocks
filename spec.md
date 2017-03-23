@@ -5,6 +5,7 @@ Layer: Consensus (soft-fork)
 Title: Extension Blocks
 Author: Christopher Jeffrey <chjj@purse.io>
         Joseph Poon <joseph@lightning.network>
+        Fedor Indutny <fedor@indutny.com>
 Status: Draft
 Created: 2017-03-17
 License: Public Domain
@@ -25,8 +26,9 @@ particularly safe.
 
 ## Specification
 
-Extension blocks are a second layer on top of canonical bitcoin blocks in which
-a miner will commit to the merkle root of an additional block of transactions.
+Extension blocks devise a second layer on top of canonical bitcoin blocks in
+which a miner will commit to the merkle root of an additional block of
+transactions.
 
 Extension blocks leverage several features of BIP141, BIP143, and BIP144 for
 transaction opt-in, serialization, verification, and network services, and as
@@ -116,6 +118,11 @@ The resolution transaction's first output MUST have a value equal to:
 
 The following output scripts and values must replicate the extension block's
 exiting outputs _exactly_ (in the same order they appear in the ext. block).
+
+The resolution transaction's version MUST be set to the uint32 max
+(`2^32 - 1`). This version is forbidden by consensus rules to be used with any
+other transaction on the canonical chain or extension chain. This is required
+for easy non-contextual identification of a resolution transaction.
 
 ### Entering an extension block
 
@@ -305,10 +312,6 @@ Output #1:
   - Value: 2.5
 ```
 
-### Reorganization
-
-TODO: Figure out all edge cases involved here.
-
 ### BIP141 Rule Changes
 
 - Aside from the resolution transaction, witness program outputs are only
@@ -320,6 +323,9 @@ TODO: Figure out all edge cases involved here.
   Size is once again the metric to be used for calculating fees/dos limits/etc.
 - The concept of `sigops cost` remains present for future soft-forkable and
   upgradeable DoS limits.
+- Any extended transaction MUST have a version with the 31st bit set to `1`.
+  Transaction version 2 on the extension chain would exist as `(1 << 30) | 2`.
+  TODO: Expand upon this.
 
 ### DoS Limits
 
@@ -330,14 +336,24 @@ canonical block).
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
 MAX_BLOCK_SIGOPS: 20000 (unchanged)
-MAX_EXTENSION_SIZE: 4000000
-MAX_EXTENSION_SIGOPS_COST: 160000
+MAX_EXTENSION_SIZE: 5000000
+MAX_EXTENSION_SIGOPS_COST: TBD
+MAX_EXTENSION_OUTPUTS_COST: TBD
 ```
+
+The maximum extension size is intentionally high. The average case block is
+truly limited by outputs cost (todo: define this) and sigops cost.
 
 Future size and computational scalability can be soft-forked in with the
 addition of new witness programs. On non-upgraded nodes, unknown witness
 programs count as 0 sigops. Lesser sigops cost can be implemented for newer
-witness programs in order to allow future soft-forked dos limit changes.
+witness programs in order to allow future soft-forked dos limit changes. This
+same notion applies to "outputs cost".
+
+### Dust Threshold
+
+TODO: Add a consensus dust threshold for the extension block. Note that this
+should also affect entering outputs, but not exiting outputs.
 
 ### Backward Compatibility (consensus)
 
@@ -353,6 +369,8 @@ For wallets currently supporting BIP141, the migration should be trivial.
 For fullnode-based services, APIs should be altered to transparently serve
 extension block transactions to clients as if they appeared in the canonical
 block. This, of course, would not include any miner API.
+
+TODO: Add wallet migration guide.
 
 ### Mining Concerns
 
@@ -409,12 +427,6 @@ migrated by way of merkle proofs. Funds may be imported to the new extension
 block by hard-coding a UTXO merkle root into the implementation as a consensus
 rule, and verifying imported funds against a merkle path.
 
-## Testnet
-
-As of [DATE], extension blocks has been activated on testnet3.
-
-Extension Blocks Aware Seed: TBA
-
 ## Testnet (extnet)
 
 A live testnet is currently running with a full implementation of extension
@@ -444,6 +456,8 @@ License: Public Domain
 TODO
 
 ## Specification
+
+Note: Separate network messages for ext-tx vs tx? ext-block vs block?
 
 ### Peer Services
 
@@ -482,7 +496,7 @@ transaction vector.
 
 TODO: Expand.
 
-### Compact Block Relay
+### Extensions to Compact Block Relay (BIP152)
 
 Compact block relay shall be initiated using the previously specified (BIP152)
 `sendcmpct` message, with a version of `3`. Serialization for `cmpctblock`,
