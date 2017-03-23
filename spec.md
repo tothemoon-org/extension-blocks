@@ -1,0 +1,524 @@
+# Extension Blocks
+
+```
+Layer: Consensus (soft-fork)
+Title: Extension Blocks
+Author: Christopher Jeffrey <chjj@purse.io>
+        Joseph Poon <joseph@lightning.network>
+Status: Draft
+Created: 2017-03-17
+License: Public Domain
+```
+
+## Abstract
+
+This specification defines a method of increasing bitcoin transaction
+throughput without altering any existing consensus rules.
+
+## Motivation
+
+Bitcoin retargetting ensures that the time in between mined blocks will be
+roughly 10 minutes. It is not possible to change this rule. There has been
+great debate regarding other ways of increasing transaction throughput, with no
+proposed consensus-layer solutions that have proven themselves to be
+particularly safe.
+
+## Specification
+
+Extension blocks are a second layer on top of canonical bitcoin blocks in which
+a miner will commit to the merkle root of an additional block of transactions.
+
+Extension blocks leverage several features of BIP141, BIP143, and BIP144 for
+transaction opt-in, serialization, verification, and network services, and as
+such, extension block activation entails BIP141 activation.
+
+This specification should be considered an extension and modification to these
+BIPs. Extension blocks are _not_ compatible with BIP141 in its current form,
+and will require a few minor additional rules.
+
+Extension blocks maintain their own UTXO set in order to avoid interference
+with the existing UTXO set of non-upgraded nodes. This is a tricky endeavor,
+requiring a `resolution` transaction to be present at the end of every
+canonical block.
+
+This specification prescribes a way of fooling non-upgraded nodes into
+believing the existing UTXO set is still behaving as they would expect.
+Unfortunately, this requires a bit of extra book-keeping on the upgraded node's
+side.
+
+### Commitment
+
+An upgraded miner willing to include entering outputs and/or an extension block
+is to include an extra coinbase output of 0 value. The output script exists as
+such:
+
+```
+OP_RETURN 0x24 0xaa21a9ee[32-byte-merkle-root]
+```
+
+The commitment serialization and discovery rules follows the same rules defined
+in BIP141.
+
+The merkle root is to be calculated as a merkle tree with all extension block
+wtxids as the leaves.
+
+Canonical blocks containing entering outputs MUST contain an extension block
+commitment (all zeroes if nothing is present in the extension block).
+
+### Extension block opt-in
+
+Outputs can signal to enter the extension block by using witness program
+scripts (specified in BIP141). Outputs signal to exit the extension block if
+the contained script is either a minimally encoded P2PKH or P2SH script.
+
+Script code aside from witness programs, p2pkh or p2sh is considered invalid in
+extension blocks.
+
+### Resolution
+
+Resolution transactions are a book-keeping mechanism which exist to maintain
+the total value of the extension block UTXO set. They exist as a consecutively
+redeemed OP_TRUE output. They handle both entrance into and exits from the
+extension block UTXO set.
+
+Every block containing an extension block commitment MUST contain a final
+`resolution` transaction. This resolution transaction spends all outputs that
+intend to enter the extension block. The resolution transaction MUST appear as
+the last transaction in the block (in order to properly sweep all of the newly
+created outputs). The funds are to be sent to a single anyone-can-spend
+(OP_TRUE) output. This output is forbidden by consensus rules to be spent by
+any transaction aside from another `resolution` transaction.
+
+The resolution transaction MAY contain additional outputs for outputs that
+intend to exit the extension block.
+
+Coinbase outputs MUST NOT contain witness programs, as they cannot be sweeped
+by the resolution transaction due to previously existing consensus rules.
+
+The first input of a resolution transaction MUST reference the first output of
+the previous resolution transaction.
+
+In order to bootstrap the activation of extension blocks, a "genesis"
+resolution transaction MUST be mined in the first block to include an extension
+block commitment along with any entering outputs (the `activation` block). This
+is the only resolution transaction in existence that does not require a
+reference to a previous resolution transaction.
+
+Fees are to propagate up from the extension block into the resolution
+transaction. In other words, the resolution transaction's fee should should be
+equal to the amount of total fees collected in the extension block.
+
+#### Resolution Rules
+
+The resolution transaction's first output MUST have a value equal to:
+
+`(previous-resolution-value + entering-value - exiting-value) - ext-block-fees`
+
+The following output scripts and values must replicate the extension block's
+exiting outputs _exactly_ (in the same order they appear in the ext. block).
+
+### Entering an extension block
+
+Any witness program output is considered an opt-in to fund a keyhash or
+scripthash within the extension block's UTXO set.
+
+Example block:
+
+```
+Transaction #1 (coinbase):
+
+Output #0:
+  - Script: P2KH
+  - Value: 12.5
+Output #1:
+  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Value: 0
+```
+
+```
+Transaction #2 (extension block funding transaction):
+
+Output #0:
+  - Script: P2WPKH (will enter the extension utxo set)
+  - Value: 5.0
+
+Output #1:
+  - Script: P2PKH (stays in the canonical utxo set)
+  - Value: 2.5
+```
+
+The resolution transaction shall redeem any witness program outputs:
+
+```
+Transaction #3 (resolution transaction):
+
+Input #0:
+  - Outpoint:
+    - Hash: previous-resolution-txid
+    - Index: 0
+
+Input #1:
+  - Outpoint:
+    - Hash: Transaction #2 TXID
+    - Index: 0
+
+Output #0:
+  - Script: OP_TRUE
+  - Value: 5.0
+```
+
+In the case that a spender wants to redeem tx2/output0, the corresponding
+extension block may exist as such:
+
+```
+Transaction #4 (redeemer of transaction #2):
+
+Input #0:
+  - Outpoint:
+    - Hash: Transaction #2 TXID
+    - Index: 0
+
+Output #0:
+  - Script: P2WPKH (this output remains in the ext. block)
+  - Value: 5.0
+```
+
+(TODO: Extension TX maturity -- newly funded ext block txs cannot spend until a
+block number has been reached? cc joseph)
+
+### Exiting an extension block
+
+In order to ensure a 1-to-1 value between the existing blockchain and the
+extension block, an exit must be provided for outputs that exist in the
+extension block.
+
+In a later transaction, the spender of Transaction #2's output may want an
+output to exit with some of their money.
+
+```
+Transaction #5 (coinbase):
+
+Output #0:
+  - Script: P2KH
+  - Value: 12.5
+
+Output #1:
+  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Value: 0
+```
+
+```
+Transaction #6 (resolution transaction):
+
+Input #0:
+  - Outpoint:
+    - Hash: previous-resolution-txid
+    - Index: 0
+
+Output #0:
+  - Script: OP_TRUE
+  - Value: 2.5
+
+Output #1:
+  - Script: P2PKH (from the exited output below)
+  - Value: 2.5
+```
+
+Extension block:
+
+```
+Transaction #7:
+
+Input #0:
+  - Outpoint:
+    - Hash: Transaction #4 TXID
+    - Index: 0
+
+Output #0:
+  - Script: P2WPKH (this output will remain in the ext. block)
+  - Value: 2.5
+
+Output #1:
+  - Script: P2PKH (note that this causes an exit!)
+  - Value: 2.5
+```
+
+### Fees
+
+Fees collected from inside the extension block propagate up to the
+corresponding resolution transaction. The resolution transaction's fee MUST be
+equal to the cumulative amount of fees collected inside the extension block.
+
+On the policy layer, transaction fees may be calculated by transaction
+cost/weight.  Any byte that would exist in the canonical blockchain is worth 4
+points (this includes entering inputs and exiting outputs!). Any byte existing
+only in the extension chain is worth 1 point.
+
+In the previous example, the spender of Transaction #2's output could have also
+added a fee.
+
+```
+Transaction #5 (coinbase):
+
+Output #0:
+  - Script: P2KH
+  - Value: 12.501 (reward + fee)
+
+Output #1:
+  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Value: 0
+```
+
+```
+Transaction #6 (resolution transaction):
+
+Input #0:
+  - Outpoint:
+    - Hash: previous-resolution-txid
+    - Index: 0
+
+Output #0:
+  - Script: OP_TRUE
+  - Value: 2.499 (fee is subtracted)
+
+Output #1:
+  - Script: P2PKH (from the exited output below)
+  - Value: 2.5
+```
+
+Extension block:
+
+```
+Transaction #7:
+
+Input #0:
+  - Outpoint:
+    - Hash: Transaction #4 TXID
+    - Index: 0
+
+Output #0:
+  - Script: P2WPKH (this output will remain in the ext. block)
+  - Value: 2.499 (fee is subtracted, this propagates up)
+
+Output #1:
+  - Script: P2PKH (note that this causes an exit!)
+  - Value: 2.5
+```
+
+### Reorganization
+
+TODO: Figure out all edge cases involved here.
+
+### BIP141 Rule Changes
+
+- Aside from the resolution transaction, witness program outputs are only
+  redeemable inside of an extension block.
+- Witness transactions may _only_ contain witness program inputs.
+- BIP141's nested P2SH feature is no longer available, and no longer a
+  consensus rule.
+- The concepts of `block weight` and `transaction weight` have been removed.
+  Size is once again the metric to be used for calculating fees/dos limits/etc.
+- The concept of `sigops cost` remains present for future soft-forkable and
+  upgradeable DoS limits.
+
+### DoS Limits
+
+DoS limits shall be enforced by a sigops cost and extension size limits (as
+long as exiting outputs do not interfere with the consensus rules of the
+canonical block).
+
+```
+MAX_BLOCK_SIZE: 1000000 (unchanged)
+MAX_BLOCK_SIGOPS: 20000 (unchanged)
+MAX_EXTENSION_SIZE: 4000000
+MAX_EXTENSION_SIGOPS_COST: 160000
+```
+
+Future size and computational scalability can be soft-forked in with the
+addition of new witness programs. On non-upgraded nodes, unknown witness
+programs count as 0 sigops. Lesser sigops cost can be implemented for newer
+witness programs in order to allow future soft-forked dos limit changes.
+
+### Backward Compatibility (consensus)
+
+TODO
+
+### Migration and adoption concerns
+
+Most of the bitcoin ecosystem is currently well-equipped to handle an upgrade
+to BIP141.
+
+For wallets currently supporting BIP141, the migration should be trivial.
+
+For fullnode-based services, APIs should be altered to transparently serve
+extension block transactions to clients as if they appeared in the canonical
+block. This, of course, would not include any miner API.
+
+### Mining Concerns
+
+TODO: Separate specification.
+
+#### Extensions to `getblocktemplate` (BIP22)
+
+In addition to the `transactions` array, conforming implementations MUST
+include an `extension` array. The `extension` array contains transactions as
+defined in BIP22 as well as the BIP145 extensions to `getblocktemplate`.
+
+Conforming implementations MUST include the resolution transaction as part of
+the `transactions` array. The resolution transaction must have an extra
+property called `resolution`, which is a boolean value set to `true`. Including
+the resoluton TX in the `transactions` array directly is done for backward
+compatibility with existing mining clients.
+
+`default_witness_commitment` has been renamed to `default_extension_commitment`
+and includes the extension block commitment script.
+
+An extra `mutable` field is defined for `"resolution"`. If `transactions` is
+present in the mutable array, `resolution` allows extension block mutation,
+provided the client is able to properly update the resolution transaction.
+
+Along with the `resolution` mutable field, a `resolution` `capabilities` field
+is also defined in order for the client to state that it is capable of updating
+the resolution transaction.
+
+For nodes dealing with out of date mining clients, storing the extension block
+locally in a map of `commitment-hash->ext. block` may be required (along with
+some reserialization during a `submitblock` call).
+
+### Activation
+
+- Version bit: 2
+- Deployment name: `extblk` (appears as `!extblk` in GBT).
+- Start time: TBD.
+- Timeout: TBD.
+
+## Deactivation
+
+Extension blocks MUST deactivate 4 years after the start date.
+
+After deactivation, exits from the extension block are still possible, but
+entrance into and transfer of funds within the extension block is no longer
+possible.
+
+By this point, a future extension block ruleset will likely have been
+developed, which is superior in terms of feature-set and scalability (see also:
+Rootstock and/or Mimblewimble).
+
+Redemption from the old extension block to the new extension block can be
+migrated by way of merkle proofs. Funds may be imported to the new extension
+block by hard-coding a UTXO merkle root into the implementation as a consensus
+rule, and verifying imported funds against a merkle path.
+
+## Testnet
+
+As of [DATE], extension blocks has been activated on testnet3.
+
+Extension Blocks Aware Seed: TBA
+
+## Testnet (extnet)
+
+A live testnet is currently running with a full implementation of extension
+blocks as of [DATE].
+
+Seed: TBA
+
+## Reference Implementation
+
+- https://github.com/bcoin-org/bcoin-extension-blocks
+
+---
+
+# Extension Blocks (peer services)
+
+```
+Layer: Peer Services
+Title: Extension Blocks (peer services)
+Author: Christopher Jeffrey <chjj@purse.io>
+Status: Draft
+Created: 2017-03-17
+License: Public Domain
+```
+
+## Abstract
+
+TODO
+
+## Specification
+
+### Peer Services
+
+Extension blocks defines a new service bit (service bit 5) to signal whether
+extension blocks is supported by the remote node.
+
+### Block and transaction relay
+
+This specification defines new INV types for GETDATA requests. Similar to the
+INV types defined in BIP144, an `extended bit` is to be set on both `tx` and
+`block` inv types. The extended bit exists as the 30th bit, e.g. `1` would
+become `536870913` (`(1 << 29) | 1`).
+
+Newly defined inv types are as follows:
+
+- `EXT_TX`: `536870913` (`(1 << 29) | 1`)
+- `EXT_BLOCK`: `536870914` (`(1 << 29) | 2`)
+
+#### Backward Compatability
+
+To avoid an enormous amount of orphan transactions on non-upgraded nodes,
+upgraded nodes shall respond with a NOTFOUND message in response to any regular
+GETDATA TX request which maps to an extension chain transaction. Invs
+containing extension transactions shall not be broadcast to non-upgraded peers.
+
+Responses GETDATA EXT_TX shall include both extension and non-extension
+transactions.
+
+### `EXT_BLOCK` message serialization
+
+`block` messages requested with the `EXT_BLOCK` inv type are to use the
+canonical serialization with an extra varint count appended. Following the
+varint count shall be a transaction vector using BIP141 serialization. Clients
+MUST disregard blocks which use BIP141 serialization in the canonical
+transaction vector.
+
+TODO: Expand.
+
+### Compact Block Relay
+
+Compact block relay shall be initiated using the previously specified (BIP152)
+`sendcmpct` message, with a version of `3`. Serialization for `cmpctblock`,
+`blocktxnrequest`, and `blocktxn` are modified to include two transaction
+vectors. The first being canonical, and the second being extended.
+
+TODO: Expand.
+
+### Compressed Extension Block Output Serialization (p2p layer)
+
+(Note: unsure about this).
+
+The extension block may result in a great amount of duplication of data due to
+the presence of the resolution transaction. As such, compression may be
+required.
+
+Todo: Rewrite all of this as structs and typedefs.
+
+Note: `varint_t` = base128 varint.
+
+Note: `bvarint_t` = base128 varint with power-of-10 compression.
+
+- Extension Input:
+  - hash (char[32])
+  - index (varint_t)
+  - sequence (uint32)
+  - stack_item_count (varint_t)
+  - witness_vector (stack_item_t)
+
+- Extension Output:
+  - version (uint8) - ranges from 0 to 16.
+  - data_size (uint8)
+  - data (char[data_size]) - ranges from 2 to 40 bytes.
+  - value (bvarint_t)
+
+- Exiting Output:
+  - version (uint8) - MUST be 255.
+  - tx_output_index (varint_t) - References an output on the resolution transaction.
+    NOTE: Maybe implied by output order on resolution tx.
