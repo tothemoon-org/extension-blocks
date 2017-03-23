@@ -135,7 +135,7 @@ Example block:
 Transaction #1 (coinbase):
 
 Output #0:
-  - Script: P2KH
+  - Script: P2PKH
   - Value: 12.5
 Output #1:
   - Script: OP_RETURN 0xaa21a9ee[merkle-root]
@@ -190,9 +190,6 @@ Output #0:
   - Value: 5.0
 ```
 
-(TODO: Extension TX maturity -- newly funded ext block txs cannot spend until a
-block number has been reached? cc joseph)
-
 ### Exiting an extension block
 
 In order to ensure a 1-to-1 value between the existing blockchain and the
@@ -206,7 +203,7 @@ output to exit with some of their money.
 Transaction #5 (coinbase):
 
 Output #0:
-  - Script: P2KH
+  - Script: P2PKH
   - Value: 12.5
 
 Output #1:
@@ -268,7 +265,7 @@ added a fee.
 Transaction #5 (coinbase):
 
 Output #0:
-  - Script: P2KH
+  - Script: P2PKH
   - Value: 12.501 (reward + fee)
 
 Output #1:
@@ -407,12 +404,13 @@ some reserialization during a `submitblock` call).
 
 - Version bit: 2
 - Deployment name: `extblk` (appears as `!extblk` in GBT).
-- Start time: TBD.
-- Timeout: TBD.
+- Start time: 1491004800 (April 1st, 2017)
+- Timeout: 1522540800 (April 1st, 2018)
 
-## Deactivation
+### Deactivation
 
-Extension blocks MUST deactivate 4 years after the start date.
+Extension blocks MUST deactivate 4 years after the start date (April 1st,
+2021).
 
 After deactivation, exits from the extension block are still possible, but
 entrance into and transfer of funds within the extension block is no longer
