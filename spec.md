@@ -255,8 +255,9 @@ equal to the cumulative amount of fees collected inside the extension block.
 
 On the policy layer, transaction fees may be calculated by transaction
 cost/weight.  Any byte that would exist in the canonical blockchain is worth 4
-points (this includes entering inputs and exiting outputs!). Any byte existing
-only in the extension chain is worth 1 point.
+points (this includes entering inputs and exiting outputs, as they both add
+size to the resolution transaction). Any byte existing only in the extension
+chain is worth 1 point.
 
 In the previous example, the spender of Transaction #2's output could have also
 added a fee.
@@ -322,13 +323,14 @@ Output #1:
   upgradeable DoS limits.
 - Any extended transaction MUST have a version with the 31st bit set to `1`.
   Transaction version 2 on the extension chain would exist as `(1 << 30) | 2`.
-  TODO: Expand upon this.
+  This bit MUST NOT be used in canonical chain transactions. This is to provide
+  an easy non-contextual way of identifying extension chain transactions.
 
 ### DoS Limits
 
-DoS limits shall be enforced by a sigops cost and extension size limits (as
-long as exiting outputs do not interfere with the consensus rules of the
-canonical block).
+DoS limits shall be enforced by a sigops cost, outputs cost and extension size
+limits (as long as exiting outputs do not interfere with the consensus rules of
+the canonical block).
 
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
@@ -339,18 +341,41 @@ MAX_EXTENSION_OUTPUTS_COST: TBD
 ```
 
 The maximum extension size is intentionally high. The average case block is
-truly limited by outputs cost (todo: define this) and sigops cost.
+truly limited by outputs cost and sigops cost.
 
 Future size and computational scalability can be soft-forked in with the
 addition of new witness programs. On non-upgraded nodes, unknown witness
-programs count as 0 sigops. Lesser sigops cost can be implemented for newer
-witness programs in order to allow future soft-forked dos limit changes. This
-same notion applies to "outputs cost".
+programs count as 0 sigops/outputs cost. Lesser cost can be implemented for
+newer witness programs in order to allow future soft-forked dos limit changes.
 
-### Dust Threshold
+#### Sigops Cost
 
-TODO: Add a consensus dust threshold for the extension block. Note that this
-should also affect entering outputs, but not exiting outputs.
+Sigops cost is to be calculated as defined in BIP141, with minor changes:
+legacy sigops and p2sh sigops are no longer calculated. Any current witness
+sigop point is to be muliplied by 4.
+
+#### Outputs Cost
+
+Outputs cost is calculated as such: all known witness program outputs are worth
+4 points, exiting output scripts are worth 8 points. Unknown witness programs
+are worth 0 points.
+
+This reserves room for 3 future soft-forked upgrades to dos limits.
+
+#### Dust Threshold
+
+A consensus dust threshold is now enforced within the extension block.
+
+Outputs containing less than 500 satoshis of value are _invalid_ within an
+extension block. This _includes_ entering outputs as well, but not exiting
+outputs.
+
+### Consensus rules for extra Lightning security
+
+If a prematurely broadcasted state from a lightning channel is included in the
+extension block, the miner MUST also ... (joseph, fill in the blanks here).
+
+This is a consensus rule within the extension block.
 
 ### Backward Compatibility (consensus)
 
@@ -369,9 +394,33 @@ block. This, of course, would not include any miner API.
 
 TODO: Add wallet migration guide.
 
+### Mempool Concerns
+
+Changes to mempool implementations are surprisingly minimal. A conforming
+mempool must disallow cross-chain spends (mixed inputs on both chains), as well
+as track exiting output's outpoints. These outpoints may not be spent inside
+the mempool.
+
+TODO: Expand.
+
 ### Mining Concerns
 
 TODO: Separate specification.
+
+#### Additional size and sigops calculation
+
+Nodes creating block templates internally will have to take into account
+entering and exiting outputs when reserving size for the canonical block. A
+transaction with entering outputs or exiting outputs adds size to the canonical
+block.
+
+Entering outputs add size in the form of inputs in the resolution transaction.
+
+Exiting outputs add both size and legacy sigops in the form of duplicated
+outputs on the resolution transaction.
+
+Transaction sorting and selection algorithms must take care to account for
+this.
 
 #### Extensions to `getblocktemplate` (BIP22)
 
@@ -404,13 +453,13 @@ some reserialization during a `submitblock` call).
 
 - Version bit: 2
 - Deployment name: `extblk` (appears as `!extblk` in GBT).
-- Start time: 1491004800 (April 1st, 2017)
-- Timeout: 1522540800 (April 1st, 2018)
+- Start time: 1491004800 (April 1st, 2017 UTC)
+- Timeout: 1522540800 (April 1st, 2018 UTC)
 
 ### Deactivation
 
 Extension blocks MUST deactivate 4 years after the start date (April 1st,
-2021).
+2021 UTC).
 
 After deactivation, exits from the extension block are still possible, but
 entrance into and transfer of funds within the extension block is no longer
@@ -424,6 +473,14 @@ Redemption from the old extension block to the new extension block can be
 migrated by way of merkle proofs. Funds may be imported to the new extension
 block by hard-coding a UTXO merkle root into the implementation as a consensus
 rule, and verifying imported funds against a merkle path.
+
+#### Motivation
+
+While deactivation may be seen as a drawback, the primary benefit of this
+specification is _not_ an extension block with a BIP141-ruleset. Instead, it is
+that the ecosystem will have laid the groundwork for handling extension blocks.
+The future of the bitcoin protocol may include several different extension
+blocks with many different rulesets.
 
 ## Testnet (extnet)
 
