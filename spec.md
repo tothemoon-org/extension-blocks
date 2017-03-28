@@ -55,7 +55,7 @@ is to include an extra coinbase output of 0 value. The output script exists as
 such:
 
 ```
-OP_RETURN 0x24 0xaa21a9ee[32-byte-merkle-root]
+OP_RETURN 0x24 0xaa21a9ee[32-byte-txid-root][32-byte-wtxid-root]
 ```
 
 The commitment serialization and discovery rules follows the same rules defined
@@ -73,8 +73,8 @@ Outputs can signal to enter the extension block by using witness program
 scripts (specified in BIP141). Outputs signal to exit the extension block if
 the contained script is either a minimally encoded P2PKH or P2SH script.
 
-Script code aside from witness programs, p2pkh or p2sh is considered invalid in
-extension blocks.
+Output script code aside from witness programs, p2pkh or p2sh is considered
+invalid in extension blocks.
 
 ### Resolution
 
@@ -91,7 +91,7 @@ created outputs). The funds are to be sent to a single anyone-can-spend
 (OP_TRUE) output. This output is forbidden by consensus rules to be spent by
 any transaction aside from another `resolution` transaction.
 
-The resolution transaction MAY contain additional outputs for outputs that
+The resolution transaction MUST contain additional outputs for outputs that
 intend to exit the extension block.
 
 Coinbase outputs MUST NOT contain witness programs, as they cannot be sweeped
@@ -328,39 +328,52 @@ Output #1:
 
 ### DoS Limits
 
-DoS limits shall be enforced by a sigops cost, outputs cost and extension size
-limits (as long as exiting outputs do not interfere with the consensus rules of
-the canonical block).
+DoS limits shall be enforced by extension block size as well as the newly
+defined metrics of inputs and outputs cost. (Note that exiting outputs inside
+the extension block affect DoS limits in the canonical block, as they add size
+and legacy sigops).
 
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
 MAX_BLOCK_SIGOPS: 20000 (unchanged)
 MAX_EXTENSION_SIZE: 5000000
-MAX_EXTENSION_SIGOPS_COST: TBD
-MAX_EXTENSION_OUTPUTS_COST: TBD
+MAX_EXTENSION_COST: TBD
 ```
 
 The maximum extension size is intentionally high. The average case block is
-truly limited by outputs cost and sigops cost.
+truly limited by inputs (sigops) and outputs cost.
 
 Future size and computational scalability can be soft-forked in with the
 addition of new witness programs. On non-upgraded nodes, unknown witness
 programs count as 0 sigops/outputs cost. Lesser cost can be implemented for
 newer witness programs in order to allow future soft-forked dos limit changes.
 
-#### Sigops Cost
+##### Extented Transaction Cost
 
-Sigops cost is to be calculated as defined in BIP141, with minor changes:
-legacy sigops and p2sh sigops are no longer calculated. Any current witness
-sigop point is to be muliplied by 4.
+Extension blocks leverage BIP141's upgradeable script behavior to also allow
+for upgradeable DoS limits.
 
-#### Outputs Cost
+###### Calculating Inputs Cost
 
-Outputs cost is calculated as such: all known witness program outputs are worth
-4 points, exiting output scripts are worth 8 points. Unknown witness programs
-are worth 0 points.
+Witness key hash v0 shall be worth 8 points.
 
-This reserves room for 3 future soft-forked upgrades to dos limits.
+Witness script hash v0 shall be worth the number of accurately counted sigops
+in the redeem script, multiplied by 8. To reduce the chance of having redeem
+scripts which simply allow for garbage data in the witness vector, every 73
+bytes in the serialized witness vector is worth an accurate sigop as well.
+
+Unknown witness programs shall be worth 1 point with an additional point for
+every 73 bytes in the serialized witness vector.
+
+This leaves room for 7 future soft-fork upgrades to relax DoS limits.
+
+###### Calculating Outputs Cost
+
+Currently defined witness programs (v0) are each worth 8 points. Unknown
+witness program outputs are worth 1 point. Any exiting output is always worth
+8 points.
+
+This leaves room for 7 future soft-fork upgrades to relax DoS limits.
 
 #### Dust Threshold
 
@@ -399,7 +412,7 @@ TODO: Add wallet migration guide.
 Changes to mempool implementations are surprisingly minimal. A conforming
 mempool must disallow cross-chain spends (mixed inputs on both chains), as well
 as track exiting output's outpoints. These outpoints may not be spent inside
-the mempool.
+the mempool (they must be redeemed from the next resolution txid in reality).
 
 TODO: Expand.
 
