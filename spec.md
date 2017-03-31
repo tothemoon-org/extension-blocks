@@ -55,14 +55,16 @@ is to include an extra coinbase output of 0 value. The output script exists as
 such:
 
 ```
-OP_RETURN 0x24 0xaa21a9ee[32-byte-txid-root][32-byte-wtxid-root]
+OP_RETURN 0x24 0xaa21a9ef[32-byte-merkle-root]
 ```
 
 The commitment serialization and discovery rules follows the same rules defined
 in BIP141.
 
 The merkle root is to be calculated as a merkle tree with all extension block
-wtxids as the leaves.
+txids and wtxids as the leaves. Regular txids, although not necessary for
+security purposes, are included for the possibility of regular TXID merkle
+proofs.
 
 Canonical blocks containing entering outputs MUST contain an extension block
 commitment (all zeroes if nothing is present in the extension block).
@@ -138,7 +140,7 @@ Output #0:
   - Script: P2PKH
   - Value: 12.5
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
   - Value: 0
 ```
 
@@ -207,7 +209,7 @@ Output #0:
   - Value: 12.5
 
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
   - Value: 0
 ```
 
@@ -253,11 +255,9 @@ Fees collected from inside the extension block propagate up to the
 corresponding resolution transaction. The resolution transaction's fee MUST be
 equal to the cumulative amount of fees collected inside the extension block.
 
-On the policy layer, transaction fees may be calculated by transaction
-cost/weight.  Any byte that would exist in the canonical blockchain is worth 4
-points (this includes entering inputs and exiting outputs, as they both add
-size to the resolution transaction). Any byte existing only in the extension
-chain is worth 1 point.
+On the policy layer, transaction fees may be calculated by transaction cost as
+well as additional size/legacy-sigops added to the canonical block due to
+entering or exiting outputs.
 
 In the previous example, the spender of Transaction #2's output could have also
 added a fee.
@@ -270,7 +270,7 @@ Output #0:
   - Value: 12.501 (reward + fee)
 
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ee[merkle-root]
+  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
   - Value: 0
 ```
 
@@ -329,9 +329,9 @@ Output #1:
 ### DoS Limits
 
 DoS limits shall be enforced by extension block size as well as the newly
-defined metrics of inputs and outputs cost. (Note that exiting outputs inside
-the extension block affect DoS limits in the canonical block, as they add size
-and legacy sigops).
+defined metrics of inputs and outputs cost. Be aware that exiting outputs
+inside the extension block affect DoS limits in the canonical block, as they
+add size and legacy sigops.
 
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
@@ -401,24 +401,38 @@ to BIP141.
 
 For wallets currently supporting BIP141, the migration should be trivial.
 
-For fullnode-based services, APIs should be altered to transparently serve
+For fullnode-based services, APIs may be altered to transparently serve
 extension block transactions to clients as if they appeared in the canonical
 block. This, of course, would not include any miner API.
 
-TODO: Add wallet migration guide.
+#### Wallet Migration
+
+Wallets currently supporting BIP141 must be modified in a few key ways:
+
+1. Transactions must pick a chain to spend from (either the canonical block or
+   the extension block, but not both). In other words, transactions must have all
+   witness program inputs, or all non-witness program inputs. For wallets that
+   support both chains, the coin selector can automatically pick which chain to
+   use if the user does not specify.
+
+2. Wallets supporting ext-blocks/BIP141 must ignore inputs on resolution
+   transactions if seen. This should be a simple check of transaction version
+   number, and similar to how wallets already ignore a coinbase's input. This
+   is necessary to prevent wallets from mistakenly seeing a double spend.
+
+3. Wallets supporting both canonical block and extension block funds must
+   ignore exiting outputs within the extension block. This is necessary to
+   prevent wallets from mistakenly indexing the same output twice.
 
 ### Mempool Concerns
 
-Changes to mempool implementations are surprisingly minimal. A conforming
-mempool must disallow cross-chain spends (mixed inputs on both chains), as well
-as track exiting output's outpoints. These outpoints may not be spent inside
-the mempool (they must be redeemed from the next resolution txid in reality).
-
-TODO: Expand.
+Changes to mempool implementations are surprisingly minimal. Although details
+may differ across implementations, a conforming mempool must disallow
+cross-chain spends (mixed inputs on both chains), as well as track exiting
+output's outpoints. These outpoints may not be spent inside the mempool (they
+must be redeemed from the next resolution txid in reality).
 
 ### Mining Concerns
-
-TODO: Separate specification.
 
 #### Additional size and sigops calculation
 
@@ -444,7 +458,7 @@ defined in BIP22 as well as the BIP145 extensions to `getblocktemplate`.
 Conforming implementations MUST include the resolution transaction as part of
 the `transactions` array. The resolution transaction must have an extra
 property called `resolution`, which is a boolean value set to `true`. Including
-the resoluton TX in the `transactions` array directly is done for backward
+the resolution TX in the `transactions` array directly is done for backward
 compatibility with existing mining clients.
 
 `default_witness_commitment` has been renamed to `default_extension_commitment`
@@ -572,35 +586,3 @@ Compact block relay shall be initiated using the previously specified (BIP152)
 vectors. The first being canonical, and the second being extended.
 
 TODO: Expand.
-
-### Compressed Extension Block Output Serialization (p2p layer)
-
-(Note: unsure about this).
-
-The extension block may result in a great amount of duplication of data due to
-the presence of the resolution transaction. As such, compression may be
-required.
-
-Todo: Rewrite all of this as structs and typedefs.
-
-Note: `varint_t` = base128 varint.
-
-Note: `bvarint_t` = base128 varint with power-of-10 compression.
-
-- Extension Input:
-  - hash (char[32])
-  - index (varint_t)
-  - sequence (uint32)
-  - stack_item_count (varint_t)
-  - witness_vector (stack_item_t)
-
-- Extension Output:
-  - version (uint8) - ranges from 0 to 16.
-  - data_size (uint8)
-  - data (char[data_size]) - ranges from 2 to 40 bytes.
-  - value (bvarint_t)
-
-- Exiting Output:
-  - version (uint8) - MUST be 255.
-  - tx_output_index (varint_t) - References an output on the resolution transaction.
-    NOTE: Maybe implied by output order on resolution tx.
