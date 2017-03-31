@@ -385,10 +385,36 @@ outputs.
 
 ### Consensus rules for extra Lightning security
 
-If a prematurely broadcasted state from a lightning channel is included in the
-extension block, the miner MUST also ... (joseph, fill in the blanks here).
+If the second highest transaction version bit (30th bit) is seto to `1`, then
+extra blockspace and sigops cost is allocated towards two transactions. The
+space limit being preallocated is two transactions of 300 bytes (for a total of
+600 bytes).
 
-This is a consensus rule within the extension block.
+The first allocation can only be consumed by a transaction which directly spends
+from the first output of this transaction.
+
+The second allocation can only consume the first output of any transaction
+within the past 2016 blocks which have the 30th bit set.
+
+If the allocation is not used by other transactions, then the transaction
+consumes that extra space, reducing the blocksize by up to 600 bytes in
+available space.
+
+This is a consensus rule within the extension block and does not apply to the
+main-chain block.
+
+The purpose is to ensure that without miner coordination, the costs will be
+unusually high for systemic attacks, since blockspace is preallocated for miners
+to include penalty Lightning Network transactions, and this is enforced since
+both parties must agree to the version bit in Commitment Transaction in
+Lightning. This is an opt-in feature in Lightning, and trades higher transaction
+fees for greater availability for penalties. The assumption is in the majority
+case of incorrect broadcast, that the penalty will go into the same block via
+the second allocation, and to give room for other transactions in the first
+allocation.
+
+This prevents specific types of systemic attacks as defined in the Lightning
+Network whitepaper risks.
 
 ### Backward Compatibility (consensus)
 
@@ -485,8 +511,8 @@ some reserialization during a `submitblock` call).
 
 ### Deactivation
 
-Extension blocks MUST deactivate 4 years after the start date (April 1st,
-2021 UTC).
+The extension block MUST deactivate 210240 blocks (around 4 years) after the
+activation of the extension block.
 
 After deactivation, exits from the extension block are still possible, but
 entrance into and transfer of funds within the extension block is no longer
@@ -500,6 +526,28 @@ Redemption from the old extension block to the new extension block can be
 migrated by way of merkle proofs. Funds may be imported to the new extension
 block by hard-coding a UTXO merkle root into the implementation as a consensus
 rule, and verifying imported funds against a merkle path.
+
+Nodes only need to have a copy of the current 32-byte merkle root of the
+deactivated extension block.
+
+This allows for fullnodes to not need to store a copy of the UTXO set on disk,
+nor keep a cache of the UTXO in memory/disk, with a tradeoff of larger on-chain
+transactions when redeeming in the future. An alternative would be for all
+clients to maintain a record of the UTXO set and keep the full bitfield in
+memory.
+
+Since the TXO set is static (with only whether it is unspent or spent changing)
+as it is deactivated from new outputs, this is simpler than designs for changing
+UTXOs:
+https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2015-October/011638.html
+
+In order to make this soft-forkable, the fund pool amount locked on the main
+chain allocated to the new extension blockchain is combined with the deactivated
+one. This allows for a direct transfer without affecting main-chain consensus
+rules (without a hard fork). The actual accounting of the allocation between the
+deactivated extension blockchain and the new one is maintained by the individual
+nodes, so it can follow any future soft-fork rule with transfers to the new
+extension blockchain.
 
 #### Motivation
 
