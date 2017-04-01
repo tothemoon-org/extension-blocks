@@ -336,12 +336,12 @@ add size and legacy sigops.
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
 MAX_BLOCK_SIGOPS: 20000 (unchanged)
-MAX_EXTENSION_SIZE: 5000000
+MAX_EXTENSION_SIZE: TBD
 MAX_EXTENSION_COST: TBD
 ```
 
-The maximum extension size is intentionally high. The average case block is
-truly limited by inputs (sigops) and outputs cost.
+The maximum extension size should be intentionally high. The average case block
+is truly limited by inputs (sigops) and outputs cost.
 
 Future size and computational scalability can be soft-forked in with the
 addition of new witness programs. On non-upgraded nodes, unknown witness
