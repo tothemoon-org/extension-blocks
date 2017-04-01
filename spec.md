@@ -385,20 +385,26 @@ outputs.
 
 ### Rules for extra Lightning security
 
+Lightning Network faces certain kinds of systemic attacks as defined in the
+Lightning Network whitepaper risks (mass-closeout of old states).
+
 If the second highest transaction version bit (30th bit) is set to to `1`
-within an extension block transaction, extra block size and transaction cost
-MUST be allocated towards two transactions. The space limit being preallocated
-is two transactions of 300 bytes (for a total of 600 bytes) (Note: Transaction
-cost TBD).
+within an extension block transaction, an extra 700-bytes is reserved on the
+transaction space used up in the block. [NOTE: Transaction space and sigops
+cost not yet defined]
 
-The first allocation may only be consumed by a transaction which directly spends
-from the first output of this transaction.
+This space per per transaction is pre-allocated and can be consumed in the same
+block by two transactions (of a maximum size of 350 bytes each), which fulfill
+specific constraints as defined below.
 
-The second allocation may only consume the first output of any transaction
+The first allocation may only be consumed by a transaction which directly
+spends from the first output of the transaction with the 30th bit set.
+
+The second allocation may only consume the first output of ANY transaction
 within the past 2016 blocks which have the 30th bit set.
 
 If the allocation is not used by other transactions, the transaction consumes
-that extra space, reducing the blocksize by up to 600 bytes in available space.
+that extra space, reducing the blocksize by up to 700 bytes in available space.
 
 This is a consensus rule within the extension block and does not apply to the
 main-chain block.
@@ -412,10 +418,6 @@ higher transaction fees for greater availability for penalties. The assumption
 is that in the majority of cases of an incorrect broadcast, the penalty will be
 included in the same block via the second allocation, and give room for other
 transactions in the first allocation.
-
-This significantly reduces the attack surface of specific types of systemic
-attacks as defined in the Lightning Network whitepaper risks (mass-closeout of
-old states).
 
 ### Backward Compatibility (consensus)
 
@@ -514,16 +516,27 @@ some reserialization during a `submitblock` call).
 
 Miners may vote on deactivation of the extension block in the future via
 median-time-past midnight May 1st, 2020 UTC upon activation of a BIP9 soft-fork
-on the 28th bit terms at 95% vote. The activation MUST be after midnight April
-1st 2021 UTC. The minimum locked-in period must be at least one year.
+on the 28th bit terms at 95% vote. The activation MUST be after midnight May
+1st 2021 UTC. The minimum locked-in period must be at least 26 retarget
+intervals.
 
 By this point, a future extension block ruleset will likely have been
 developed, which is superior in terms of feature-set and scalability (see also:
 Rootstock and/or Mimblewimble). This enabls updates for long-term scalability
 solutions with minimal baggage of supporting deprecated chains.
 
+After deactivation, it is expected by the community that exits from the
+extension block will still still be possible and secure according to the terms
+of the yet-to-be-designed soft-fork, but entrance into and transfer of funds
+within the extension block could be no longer permitted. 
+
+We propose two possible solutions for deactivation, one of which will be
+selected in the final version of this document.
+
+#### Deactivation Option #1
+
 Upon activation of the 28th bit (voting start after midnight May 1st 2020 UTC,
-activation MUST be after midnight April 1st, 2021 UTC at 95% vote), the
+activation MUST be after midnight May 1st, 2021 UTC at 95% vote), the
 resolution output will return to being an output which anyone-can-spend as a
 consensus rule today. This 28th BIP9 bit (or another BIP9 bit in conjunction)
 can be overloaded to enable soft-fork activation to prevent this from actually
@@ -535,14 +548,27 @@ be usable and redeemable in the general deactivation design below. If proper
 and safe withdrawals are not activated within the terms, users and exchanges
 can refuse to acknolwedge blocks with the bit set as a soft-fork.
 
-#### Understanding of Future Deactivation Design
+It is possible to do a direct upgrade of the extension block by using the same
+output set upon BIP9 activation of the 28th bit in conjunction with new rules
+on another bit (e.g. 27th bit activates the new chain conditionally upon the
+28th bit also being activated, creating a direct migration into a new extension
+block without new transactions on the main-chain).
 
-After deactivation, it is expected by the community that exits from the
-extension block will still still be possible and secure according to the terms
-of the yet-to-be-designed soft-fork, but entrance into and transfer of funds
-within the extension block could be no longer permitted. It is understood that
-this soft-fork will be overloaded with enforcement of withdrawal/redemption of
-funds so that it requires the script terms to be parsed upon withdrawal.
+It is understood that this soft-fork will be overloaded with enforcement of
+withdrawal/redemption of funds so that it requires the script terms to be
+parsed upon withdrawal.
+
+#### Deactivation Option #2
+
+Upon activation of the 28th bit (voting start after midnight May 1st 2020 UTC,
+activation MUST be after midnight May 1st, 2021 UTC at 95% vote), no further
+transactions are permitted inside the extension block. Withdrawals to the
+main-chain only via merkle proofs are only permitted.
+
+This requires code and specification for merkle-proof withdrawals to be
+specified and available today.
+
+#### Deactivation via Merkle Tree Proofs.
 
 Redemption from the old extension block to the main-chain and new extension
 block can be migrated by way of merkle proofs to be designed in the future.
@@ -562,12 +588,6 @@ Since the TXO set is static (with only whether it is unspent or spent changing)
 as it is deactivated from new outputs, this is simpler than currently proposed
 designs for changing UTXOs:
 https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2015-October/011638.html
-
-It is possible to do a direct upgrade of the extension block by using the same
-output set upon BIP9 activation of the 28th bit in conjunction with new rules
-on another bit (e.g. 27th bit activates the new chain conditionally upon the
-28th bit also being activated, creating a direct migration into a new extension
-block without new transactions on the main-chain).
 
 #### Motivation
 
