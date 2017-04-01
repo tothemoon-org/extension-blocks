@@ -522,13 +522,13 @@ intervals.
 
 By this point, a future extension block ruleset will likely have been
 developed, which is superior in terms of feature-set and scalability (see also:
-Rootstock and/or Mimblewimble). This enabls updates for long-term scalability
+Rootstock and/or Mimblewimble). This enables updates for long-term scalability
 solutions with minimal baggage of supporting deprecated chains.
 
 After deactivation, it is expected by the community that exits from the
 extension block will still still be possible and secure according to the terms
 of the yet-to-be-designed soft-fork, but entrance into and transfer of funds
-within the extension block could be no longer permitted. 
+within the extension block could be no longer permitted.
 
 We propose two possible solutions for deactivation, one of which will be
 selected in the final version of this document.
