@@ -413,8 +413,9 @@ is that in the majority of cases of an incorrect broadcast, the penalty will be
 included in the same block via the second allocation, and give room for other
 transactions in the first allocation.
 
-This prevents specific types of systemic attacks as defined in the Lightning
-Network whitepaper risks.
+This significantly reduces the attack surface of specific types of systemic
+attacks as defined in the Lightning Network whitepaper risks (mass-closeout of
+old states).
 
 ### Backward Compatibility (consensus)
 
@@ -511,21 +512,43 @@ some reserialization during a `submitblock` call).
 
 ### Deactivation
 
-The extension block MUST deactivate 210240 blocks (around 4 years) after the
-activation of the extension block.
-
-After deactivation, exits from the extension block are still possible, but
-entrance into and transfer of funds within the extension block is no longer
-possible.
+Miners may vote on deactivation of the extension block in the future via
+median-time-past midnight May 1st, 2020 UTC upon activation of a BIP9 soft-fork
+on the 28th bit terms at 95% vote. The activation MUST be after midnight April
+1st 2021 UTC. The minimum locked-in period must be at least one year.
 
 By this point, a future extension block ruleset will likely have been
 developed, which is superior in terms of feature-set and scalability (see also:
-Rootstock and/or Mimblewimble).
+Rootstock and/or Mimblewimble). This enabls updates for long-term scalability
+solutions with minimal baggage of supporting deprecated chains.
 
-Redemption from the old extension block to the new extension block can be
-migrated by way of merkle proofs. Funds may be imported to the new extension
-block by hard-coding a UTXO merkle root into the implementation as a consensus
-rule, and verifying imported funds against a merkle path.
+Upon activation of the 28th bit (voting start after midnight May 1st 2020 UTC,
+activation MUST be after midnight April 1st, 2021 UTC at 95% vote), the
+resolution output will return to being an output which anyone-can-spend as a
+consensus rule today. This 28th BIP9 bit (or another BIP9 bit in conjunction)
+can be overloaded to enable soft-fork activation to prevent this from actually
+being an anyone-can-spend in the future. This allows for enabling future
+extension block features without hard-forking the code.
+
+A social contract is understood whereby the funds in the extension block will
+be usable and redeemable in the general deactivation design below. If proper
+and safe withdrawals are not activated within the terms, users and exchanges
+can refuse to acknolwedge blocks with the bit set as a soft-fork.
+
+#### Understanding of Future Deactivation Design
+
+After deactivation, it is expected by the community that exits from the
+extension block will still still be possible and secure according to the terms
+of the yet-to-be-designed soft-fork, but entrance into and transfer of funds
+within the extension block could be no longer permitted. It is understood that
+this soft-fork will be overloaded with enforcement of withdrawal/redemption of
+funds so that it requires the script terms to be parsed upon withdrawal.
+
+Redemption from the old extension block to the main-chain and new extension
+block can be migrated by way of merkle proofs to be designed in the future.
+Funds may be imported to the new extension block by hard-coding a UTXO merkle
+root into the implementation as a consensus rule, and verifying imported funds
+against a merkle path.
 
 To enable importing, nodes require only a copy of the current 32-byte merkle
 root of the deactivated extension block.
@@ -540,13 +563,11 @@ as it is deactivated from new outputs, this is simpler than currently proposed
 designs for changing UTXOs:
 https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2015-October/011638.html
 
-In order to make this soft-forkable, the fund pool amount locked on the main
-chain allocated to the new extension blockchain is combined with the deactivated
-one. This allows for a direct transfer without affecting main-chain consensus
-rules (without a hard fork). The actual accounting of the allocation between the
-deactivated extension blockchain and the new one is maintained by the individual
-nodes, so it can follow any future soft-fork rule with transfers to the new
-extension blockchain.
+It is possible to do a direct upgrade of the extension block by using the same
+output set upon BIP9 activation of the 28th bit in conjunction with new rules
+on another bit (e.g. 27th bit activates the new chain conditionally upon the
+28th bit also being activated, creating a direct migration into a new extension
+block without new transactions on the main-chain).
 
 #### Motivation
 
