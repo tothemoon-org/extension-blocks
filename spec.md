@@ -332,6 +332,9 @@ currently deployed softforks, along with an extra BIP141-like ruleset.
 Transactions within the extended transaction vector MAY include a witness
 vector using BIP141 transaction serialization.
 
+Verification shall be performed on extended transactions with `VERIFY_WITNESS`
+rules.
+
 Extended transactions MUST NOT have any access to the canonical UTXO set.
 
 If an extension block fails any consensus check, the upgraded node MUST
