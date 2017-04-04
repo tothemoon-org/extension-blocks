@@ -419,7 +419,7 @@ within an extension block transaction, an extra 700-bytes is reserved on the
 transaction space used up in the block. [NOTE: Transaction space and sigops
 cost not yet defined]
 
-This space per per transaction is pre-allocated and can be consumed in the same
+This space per transaction is pre-allocated and can be consumed in the same
 block by two transactions (of a maximum size of 350 bytes each), which fulfill
 specific constraints as defined below.
 
