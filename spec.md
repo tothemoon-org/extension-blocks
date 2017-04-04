@@ -545,7 +545,7 @@ database migration.
 
 ### Deactivation
 
-Miners may vote on deactivation of the extension block via another BIP9
+Miners may vote on deactivation of the extension block via the 28th BIP9
 softfork bit. The "deactivation" deployment's start time shall begin 3 years
 after the start time of extension blocks, with a miner activation threshold of
 95%. The minimum locked-in period must be at least 26 retarget intervals (1
