@@ -569,13 +569,12 @@ selected in the final version of this document.
 
 #### Deactivation Option #1
 
-Upon activation of the 28th bit (voting start after midnight May 1st 2020 UTC,
-activation MUST be after midnight May 1st, 2021 UTC at 95% vote), the
-resolution output will return to being an output which anyone-can-spend as a
-consensus rule today. This 28th BIP9 bit (or another BIP9 bit in conjunction)
-can be overloaded to enable soft-fork activation to prevent this from actually
-being an anyone-can-spend in the future. This allows for enabling future
-extension block features without hard-forking the code.
+Upon activation of the 28th bit, the resolution output will return to being an
+output which anyone-can-spend as a consensus rule today. This 28th BIP9 bit (or
+another BIP9 bit in conjunction) can be overloaded to enable soft-fork
+activation to prevent this from actually being an anyone-can-spend in the
+future. This allows for enabling future extension block features without
+hard-forking the code.
 
 A social contract is understood whereby the funds in the extension block will
 be usable and redeemable in the general deactivation design below. If proper
