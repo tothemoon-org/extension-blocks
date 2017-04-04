@@ -540,16 +540,16 @@ database migration.
 
 - Version bit: 2
 - Deployment name: `extblk` (appears as `!extblk` in GBT).
-- Start time: 1491004800 (May 1st, 2017 UTC)
-- Timeout: 1522540800 (May 1st, 2018 UTC)
+- Start time: TBD
+- Timeout: TBD
 
 ### Deactivation
 
-Miners may vote on deactivation of the extension block in the future via
-median-time-past midnight May 1st, 2020 UTC upon activation of a BIP9 soft-fork
-on the 28th bit terms at 95% vote. The activation MUST be after midnight May
-1st 2021 UTC. The minimum locked-in period must be at least 26 retarget
-intervals.
+Miners may vote on deactivation of the extension block via another BIP9
+softfork bit. The "deactivation" deployment's start time shall begin 3 years
+after the start time of extension blocks, with a miner activation threshold of
+95%. The minimum locked-in period must be at least 26 retarget intervals (1
+year).
 
 By this point, a future extension block ruleset will likely have been
 developed, which is superior in terms of feature-set and scalability (see also:
