@@ -70,8 +70,8 @@ OP_RETURN 0x24 0xaa21a9ef[32-byte-merkle-root]
 The commitment serialization and discovery rules follows the same rules defined
 in BIP141.
 
-The merkle root is to be calculated as a merkle tree with all extension block
-txids and wtxids as the leaves.
+The merkle root is to be calculated as a merkle tree with all extension and
+canonical block txids and wtxids as the leaves.
 
 Note that canonical blocks containing entering outputs MUST contain an
 extension block commitment (all zeroes if nothing is present in the extension
