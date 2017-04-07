@@ -613,10 +613,9 @@ parsed upon withdrawal.
 
 #### Deactivation Option #2
 
-Upon activation of the 28th bit (voting start after midnight May 1st 2020 UTC,
-activation MUST be after midnight May 1st, 2021 UTC at 95% vote), no further
-transactions are permitted inside the extension block. Withdrawals to the
-main-chain only via merkle proofs are only permitted.
+Upon activation of the 28th bit, no further transactions are permitted inside
+the extension block. Withdrawals to the main-chain only via merkle proofs are
+only permitted.
 
 This requires code and specification for merkle-proof withdrawals to be
 specified and available today.
