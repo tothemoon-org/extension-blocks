@@ -19,19 +19,23 @@ throughput without altering any existing consensus rules.
 
 ## Motivation
 
+The bitcoin network's transaction throughput is correlated with its consensus
+rules regarding retargetting and denial-of-service limits.
+
 Bitcoin retargetting ensures that the time in between mined blocks will be
 roughly 10 minutes. It is not possible to change this rule. There has been
-great debate regarding other ways of increasing transaction throughput, with no
-proposed consensus-layer solutions that have proven themselves to be
+debate regarding other ways of greatly increasing transaction throughput, with
+no proposed consensus-layer solutions that have proven themselves to be
 particularly safe.
 
 ## History
 
 _Auxiliary blocks_, as first proposed by [Johnson Lau in 2013][aux], outlined a
 way of having funds enter and exit an additional block by using special
-opcodes. This specification refines many of Lau's ideas, and offers a much
-simpler method of tackling the value transfer issue, which, in Lau's proposal,
-was solved with consensus-layer UTXO selection.
+opcodes.
+
+_Extension blocks_ were a later proposal, also [from Lau in 2017][ext], which
+revised many of the ideas of the original proposal.
 
 ## Specification
 
@@ -41,7 +45,7 @@ transactions.
 
 Extension blocks leverage several features of BIP141, BIP143, and BIP144 for
 transaction opt-in, serialization, verification, and network services, and as
-such, extension block activation entails BIP141 activation.
+such, the extension block includes nearly all features of the said BIPs.
 
 This specification should be considered an extension and modification to these
 BIPs. Extension blocks are _not_ compatible with BIP141 in its current form,
@@ -153,6 +157,7 @@ Transaction #1 (coinbase):
 Output #0:
   - Script: P2PKH
   - Value: 12.5
+
 Output #1:
   - Script: OP_RETURN 0xaa21a9ef[merkle-root]
   - Value: 0
@@ -639,5 +644,6 @@ https://github.com/bcoin-org/bcoin-extension-blocks
 This document is hereby placed in the public domain.
 
 [aux]: https://bitcointalk.org/index.php?topic=283746.0
+[ext]: https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2017-January/013490.html
 [rsk]: https://uploads.strikinglycdn.com/files/90847694-70f0-4668-ba7f-dd0c6b0b00a1/RootstockWhitePaperv9-Overview.pdf
 [mw]: https://scalingbitcoin.org/papers/mimblewimble.txt
