@@ -44,12 +44,10 @@ which a miner will commit to the merkle root of an additional block of
 transactions.
 
 Extension blocks leverage several features of BIP141, BIP143, and BIP144 for
-transaction opt-in, serialization, verification, and network services, and as
-such, the extension block includes nearly all features of the said BIPs.
-
-This specification should be considered an extension and modification to these
-BIPs. Extension blocks are _not_ compatible with BIP141 in its current form,
-and will require a few minor additional rules.
+transaction opt-in, serialization, verification, and network services. This
+specification should be considered an extension and modification to these BIPs.
+Extension blocks are _not_ compatible with BIP141 in its current form, and will
+require a few minor additional rules.
 
 Extension blocks maintain their own UTXO set in order to avoid interference
 with the existing UTXO set of non-upgraded nodes. This is a tricky endeavor,
