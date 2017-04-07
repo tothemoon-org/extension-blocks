@@ -393,7 +393,7 @@ addition of new witness programs. On non-upgraded nodes, unknown witness
 programs count as 1 inputs/outputs cost. Lesser cost can be implemented for
 newer witness programs in order to allow future soft-forked dos limit changes.
 
-##### Extented Transaction Cost
+##### Extended Transaction Cost
 
 Extension blocks leverage BIP141's upgradeable script behavior to also allow
 for upgradeable DoS limits.
