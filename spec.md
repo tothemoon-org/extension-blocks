@@ -268,6 +268,16 @@ Output #1:
   - Value: 2.5
 ```
 
+#### Exit Maturity Requirement
+
+Similar to coinbase transactions, resolution transactions can also be
+permanently un-mined in the case of a reorganization. This potentially
+invalidates all spends from any exiting outputs it may have contained,
+rendering the spending transactions not relayable and no longer mineable on the
+best chain. An exit maturity requirement is required for this reason.
+
+See: https://github.com/tothemoon-org/extension-blocks/issues/9
+
 ### Fees
 
 Fees collected from inside the extension block propagate up to the
