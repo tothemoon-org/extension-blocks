@@ -266,6 +266,13 @@ Output #1:
   - Value: 2.5
 ```
 
+#### Exit Redemption
+
+As described above, outputs exit from the extension block onto the main chain
+by way of the resolution transaction. The outpoint created in the extension
+block MUST not to be spent on either chain. Instead, exiting outputs must be
+spent from outpoints created on the resolution transaction.
+
 #### Exit Maturity Requirement
 
 Similar to coinbase transactions, resolution transactions can also be
