@@ -119,10 +119,10 @@ equal to the amount of total fees collected in the extension block.
 #### Bootstrapping
 
 In order to bootstrap the activation of extension blocks, a "genesis"
-resolution transaction MUST be mined in the first block to include an extension
-block commitment along with any entering outputs (the `activation` block). This
-is the only resolution transaction in existence that does not require a
-reference to a previous resolution transaction.
+resolution transaction MUST be mined in the first block to include any entering
+outputs (the `activation` block). This is the only resolution transaction in
+existence that does not require a reference to a previous resolution
+transaction.
 
 The genesis resolution transaction MAY also include a 1-100 byte pushdata in
 the first input script, allowing the miner of the genesis resolution to add a
@@ -381,45 +381,49 @@ add size and legacy sigops.
 ```
 MAX_BLOCK_SIZE: 1000000 (unchanged)
 MAX_BLOCK_SIGOPS: 20000 (unchanged)
-MAX_EXTENSION_SIZE: TBD
-MAX_EXTENSION_COST: TBD
+MAX_EXTENSION_SIZE: 6000000
+MAX_EXTENSION_COST: 9600000
+MAX_EXTENSION_SIGOPS_COST: 320000
 ```
 
-The maximum extension size should be intentionally high. The average case block
-is truly limited by inputs (sigops) and outputs cost.
+The maximum extension size is intentionally high (6mb). The average case block
+is truly limited by "extension cost" and "sigops cost".
 
-Future size and computational scalability can be soft-forked in with the
-addition of new witness programs. On non-upgraded nodes, unknown witness
-programs count as 1 inputs/outputs cost. Lesser cost can be implemented for
-newer witness programs in order to allow future soft-forked dos limit changes.
-
-##### Extended Transaction Cost
+The max extension cost will result in an average case block size of roughly
+2mb, with a worst case of 6mb (assuming a miner includes garbage data in
+witness vectors).
 
 Extension blocks leverage BIP141's upgradeable script behavior to also allow
-for upgradeable DoS limits.
+for upgradeable DoS limits. Future size and computational scalability can be
+soft-forked in with the addition of new witness programs. On non-upgraded
+nodes, unknown witness programs count as an extension cost factor of 1. Lesser
+cost can be implemented for newer witness programs in order to allow future
+soft-forked dos limit changes.
 
-###### Calculating Inputs Cost
+#### Calculating Inputs Cost
 
-Witness key hash v0 shall be worth 1 point, multiplied by a factor of 8.
+Witness programs with a version of zero shall be worth 8 points for every byte
+in the serialized witness vector (including the varint item count).
+
+Unknown witness programs shall be worth 1 point for every byte in the witness
+vector.
+
+#### Calculating Outputs Cost
+
+Witness programs with a version of zero shall be worth 8 points for every byte
+in the output script (including the varint size prefix).
+
+Exiting outputs shall be worth 8 points for every byte in the output script.
+Note that this cost is not upgradeable.
+
+Unknown witness programs shall be worth 1 point for every byte in output script.
+
+#### Calculating Sigops Cost
+
+Witness key hash v0 shall be worth 8 points.
 
 Witness script hash v0 shall be worth the number of accurately counted sigops
-in the redeem script, multiplied by a factor of 8.
-
-Unknown witness programs shall be worth 1 point, multiplied by a factor of 1.
-
-To reduce the chance of having redeem scripts which simply allow for garbage
-data in the witness vector, every 73 bytes in the serialized witness vector is
-worth 1 additional point.
-
-This leaves room for 7 future soft-fork upgrades to relax DoS limits.
-
-###### Calculating Outputs Cost
-
-Currently defined witness programs (v0) are each worth 8 points. Unknown
-witness program outputs are worth 1 point. Any exiting output is always worth
-8 points.
-
-This leaves room for 7 future soft-fork upgrades to relax DoS limits.
+(bip16 counting) in the redeem script, multiplied by a factor of 8.
 
 #### Dust Threshold
 
