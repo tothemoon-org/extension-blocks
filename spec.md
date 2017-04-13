@@ -61,9 +61,8 @@ side.
 
 ### Commitment
 
-An upgraded miner willing to include entering outputs and/or an extension block
-is to include an extra coinbase output of 0 value. The output script exists as
-such:
+An upgraded miner willing to include extension block is to include an extra
+coinbase output of 0 value. The output script exists as such:
 
 ```
 OP_RETURN 0x24 0xaa21a9ef[32-byte-merkle-root]
@@ -75,9 +74,8 @@ in BIP141.
 The merkle root is to be calculated as a merkle tree with all extension and
 canonical block txids and wtxids as the leaves.
 
-Note that canonical blocks containing entering outputs MUST contain an
-extension block commitment (all zeroes if nothing is present in the extension
-block).
+Any block containing an extension block MUST include an extension commitment
+output.
 
 ### Extension block opt-in
 
@@ -95,7 +93,7 @@ the total value of the extension block UTXO set. They exist as a consecutively
 redeemed OP_TRUE output. They handle both entrance into and exits from the
 extension block UTXO set.
 
-Every block containing an extension block commitment MUST contain a final
+Every block containing entering or exiting outputs MUST contain a final
 `resolution` transaction. This resolution transaction spends all outputs that
 intend to enter the extension block. The resolution transaction MUST appear as
 the last transaction in the block (in order to properly sweep all of the newly
@@ -124,9 +122,10 @@ block commitment along with any entering outputs (the `activation` block). This
 is the only resolution transaction in existence that does not require a
 reference to a previous resolution transaction.
 
-The genesis resolution transaction MAY also include a 1-100 byte pushdata in
-the first input script, allowing the miner of the genesis resolution to add a
-special message. The pushdata MUST be castable to a true boolean.
+The genesis resolution transaction MAY also include a 1-100 byte script in the
+first input, containing a single push-only opcode. This allows the miner of the
+genesis resolution to add a special message. The input script MUST execute
+without failure (no malformed pushdatas, no OP_RESERVED).
 
 #### Resolution Rules
 
