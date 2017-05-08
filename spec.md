@@ -44,10 +44,12 @@ which a miner will commit to the merkle root of an additional block of
 transactions.
 
 Extension blocks leverage several features of BIP141, BIP143, and BIP144 for
-transaction opt-in, serialization, verification, and network services. This
-specification should be considered an extension and modification to these BIPs.
-Extension blocks are _not_ compatible with BIP141 in its current form, and will
-require a few minor additional rules.
+transaction opt-in, serialization, verification, and network services.
+Extension blocks themselves will require BIP141 to be activated on the
+canonical chain in order to be useable.
+
+This specification should be considered an extension and modification to these
+BIPs.
 
 Extension blocks maintain their own UTXO set in order to avoid interference
 with the existing UTXO set of non-upgraded nodes. This is a tricky endeavor,
@@ -61,30 +63,40 @@ side.
 
 ### Commitment
 
-An upgraded miner willing to include extension block is to include an extra
-coinbase output of 0 value. The output script exists as such:
+In addition to the BIP141 commitment, an upgraded miner willing to include
+extension block is to include an extra coinbase output of 0 value. The output
+script exists as such:
 
 ```
-OP_RETURN 0x24 0xaa21a9ef[32-byte-merkle-root]
+OP_RETURN 0x24 0x45424c4b[32-byte-merkle-root]
 ```
 
 The commitment serialization and discovery rules follows the same rules defined
 in BIP141.
 
-The merkle root is to be calculated as a merkle tree with all extension and
-canonical block txids and wtxids as the leaves.
+The merkle root is to be calculated as a merkle tree of the extension block
+transactions, with txids as the left side of the leaves and wtxids on the
+right.
 
 Any block containing an extension block MUST include an extension commitment
 output.
 
 ### Extension block opt-in
 
-Outputs can signal to enter the extension block by using witness program
-scripts (specified in BIP141). Outputs signal to exit the extension block if
-the contained script is either a minimally encoded P2PKH or P2SH script.
+Outputs can signal to enter the extension block by using a witness program
+script with a version of 9 through 16. Outputs signal to exit the extension
+block if the contained script is witness program version within the range of 0
+to 8.
 
-Output script code aside from witness programs, p2pkh or p2sh is considered
+Output script code aside from witness programs versions 9 to 16 are considered
 invalid in extension blocks.
+
+This specification defines two new witness programs (version 9):
+
+- P2WPKHv9 in the form of `OP_9 0x14 [20-byte-hash]`.
+- P2WSHv9 in the form of `OP_9 0x20 [32-byte-hash]`.
+
+These mirror the behavior of witness program version `0` exactly.
 
 ### Resolution
 
@@ -104,8 +116,9 @@ any transaction aside from another `resolution` transaction.
 The resolution transaction MUST contain additional outputs for outputs that
 intend to exit the extension block.
 
-Coinbase outputs MUST NOT contain witness programs, as they cannot be sweeped
-by the resolution transaction due to previously existing consensus rules.
+Coinbase outputs MUST NOT contain v9-v16 witness programs, as they cannot be
+sweeped by the resolution transaction due to previously existing consensus
+rules.
 
 The first input of a resolution transaction MUST reference the first output of
 the previous resolution transaction.
@@ -117,15 +130,10 @@ equal to the amount of total fees collected in the extension block.
 #### Bootstrapping
 
 In order to bootstrap the activation of extension blocks, a "genesis"
-resolution transaction MUST be mined in the first block to include an extension
-block commitment along with any entering outputs (the `activation` block). This
-is the only resolution transaction in existence that does not require a
-reference to a previous resolution transaction.
-
-The genesis resolution transaction MAY also include a 1-100 byte script in the
-first input, containing a single push-only opcode. This allows the miner of the
-genesis resolution to add a special message. The input script MUST execute
-without failure (no malformed pushdatas, no OP_RESERVED).
+resolution transaction MUST be mined in the first block to include any entering
+outputs (the `activation` block). This is the only resolution transaction in
+existence that does not require a reference to a previous resolution
+transaction.
 
 #### Resolution Rules
 
@@ -133,7 +141,11 @@ The resolution transaction's first output MUST have a value equal to:
 
 `(previous-resolution-value + entering-value - exiting-value) - ext-block-fees`
 
-The following output scripts and values must replicate the extension block's
+With an output script of:
+
+`OP_TRUE`
+
+The following outputs' scripts and values must replicate the extension block's
 exiting outputs _exactly_ (in the same order they appear in the ext. block).
 
 The resolution transaction's version MUST be set to the uint32 max (`2^32 - 1`).
@@ -156,7 +168,7 @@ Output #0:
   - Value: 12.5
 
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
+  - Script: OP_RETURN 0x45424c4b[merkle-root]
   - Value: 0
 ```
 
@@ -164,7 +176,7 @@ Output #1:
 Transaction #2 (extension block funding transaction):
 
 Output #0:
-  - Script: P2WPKH (will enter the extension utxo set)
+  - Script: P2WPKHv9 (will enter the extension utxo set)
   - Value: 5.0
 
 Output #1:
@@ -204,7 +216,7 @@ Input #0:
     - Index: 0
 
 Output #0:
-  - Script: P2WPKH (this output remains in the ext. block)
+  - Script: P2WPKHv9 (this output remains in the ext. block)
   - Value: 5.0
 ```
 
@@ -225,7 +237,7 @@ Output #0:
   - Value: 12.5
 
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
+  - Script: OP_RETURN 0x45424c4b[merkle-root]
   - Value: 0
 ```
 
@@ -242,7 +254,7 @@ Output #0:
   - Value: 2.5
 
 Output #1:
-  - Script: P2PKH (duplicated from the exited output below)
+  - Script: P2WPKHv0 (duplicated from the exited output below)
   - Value: 2.5
 ```
 
@@ -257,11 +269,11 @@ Input #0:
     - Index: 0
 
 Output #0:
-  - Script: P2WPKH (this output will remain in the ext. block)
+  - Script: P2WPKHv9 (this output will remain in the ext. block)
   - Value: 2.5
 
 Output #1:
-  - Script: P2PKH (note that this causes an exit!)
+  - Script: P2WPKHv0 (note that this causes an exit!)
   - Value: 2.5
 ```
 
@@ -280,17 +292,14 @@ invalidates all spends from any exiting outputs it may have contained,
 rendering the spending transactions not relayable and no longer mineable on the
 best chain. An exit maturity requirement is required for this reason.
 
-See: https://github.com/tothemoon-org/extension-blocks/issues/9
+The exit maturity requirement for spends of resolution outputs shall be `15`
+blocks. Any block containing a premature spend should be considered invalid.
 
 ### Fees
 
 Fees collected from inside the extension block propagate up to the
 corresponding resolution transaction. The resolution transaction's fee MUST be
 equal to the cumulative amount of fees collected inside the extension block.
-
-On the policy layer, transaction fees may be calculated by transaction cost as
-well as additional size/legacy-sigops added to the canonical block due to
-entering or exiting outputs.
 
 In the previous example, the spender of Transaction #2's output could have also
 added a fee.
@@ -303,7 +312,7 @@ Output #0:
   - Value: 12.501 (reward + fee)
 
 Output #1:
-  - Script: OP_RETURN 0xaa21a9ef[merkle-root]
+  - Script: OP_RETURN 0x45424c4b[merkle-root]
   - Value: 0
 ```
 
@@ -320,7 +329,7 @@ Output #0:
   - Value: 2.499 (fee is subtracted)
 
 Output #1:
-  - Script: P2PKH (from the exited output below)
+  - Script: P2WPKHv0 (from the exited output below)
   - Value: 2.5
 ```
 
@@ -335,11 +344,11 @@ Input #0:
     - Index: 0
 
 Output #0:
-  - Script: P2WPKH (this output will remain in the ext. block)
+  - Script: P2WPKHv9 (this output will remain in the ext. block)
   - Value: 2.499 (fee is subtracted, this propagates up)
 
 Output #1:
-  - Script: P2PKH (note that this causes an exit!)
+  - Script: P2WPKHv0 (note that this causes an exit!)
   - Value: 2.5
 ```
 
@@ -348,24 +357,23 @@ Output #1:
 Verification of transactions within the extension block shall enforce all
 currently deployed softforks, along with an extra BIP141-like ruleset.
 
-Transactions within the extended transaction vector MAY include a witness
+Transactions within the extended transaction vector MUST include a witness
 vector using BIP141 transaction serialization.
 
 Verification shall be performed on extended transactions with `VERIFY_WITNESS`
 rules.
 
-Extended transactions MUST NOT have any access to the canonical UTXO set.
+Extended transactions MUST NOT have any access to the canonical UTXO set. If
+they attempt to access any canonical UTXOs, they should be treated no
+differently than if they were to access non-existent UTXOs.
 
 If an extension block fails any consensus check, the upgraded node MUST
 consider the entire block invalid.
 
-### BIP141 Rule Changes
+### BIP141 Rule Changes within the Extension Block
 
-- Aside from the resolution transaction, witness program outputs are only
-  redeemable inside of an extension block.
-- Witness transactions may _only_ contain witness program inputs.
-- BIP141's nested P2SH feature is no longer available, and no longer a
-  consensus rule.
+- BIP141's nested P2SH feature is no longer available within the extension
+  block.
 - The concepts of `block weight` and `transaction weight` have been removed.
 - The concept of `sigops cost` remains present for future soft-forkable and
   upgradeable DoS limits.
@@ -378,47 +386,49 @@ inside the extension block affect DoS limits in the canonical block, as they
 add size and legacy sigops.
 
 ```
-MAX_BLOCK_SIZE: 1000000 (unchanged)
-MAX_BLOCK_SIGOPS: 20000 (unchanged)
 MAX_EXTENSION_SIZE: TBD
 MAX_EXTENSION_COST: TBD
+MAX_EXTENSION_SIGOPS_COST: TBD
 ```
 
-The maximum extension size should be intentionally high. The average case block
-is truly limited by inputs (sigops) and outputs cost.
+The maximum extension size is intentionally high (TBD). The average case block
+is truly limited by "extension cost" and "sigops cost".
 
-Future size and computational scalability can be soft-forked in with the
-addition of new witness programs. On non-upgraded nodes, unknown witness
-programs count as 1 inputs/outputs cost. Lesser cost can be implemented for
-newer witness programs in order to allow future soft-forked dos limit changes.
-
-##### Extended Transaction Cost
+The max extension cost will result in an average case block size of roughly
+TBD, with a worst case of TBD (assuming a miner includes garbage data in
+witness vectors).
 
 Extension blocks leverage BIP141's upgradeable script behavior to also allow
-for upgradeable DoS limits.
+for upgradeable DoS limits. Future size and computational scalability can be
+soft-forked in with the addition of new witness programs. On non-upgraded
+nodes, unknown witness programs count as an extension cost factor of 1. Lesser
+cost can be implemented for newer witness programs in order to allow future
+soft-forked dos limit changes.
 
-###### Calculating Inputs Cost
+#### Calculating Inputs Cost
 
-Witness key hash v0 shall be worth 1 point, multiplied by a factor of 8.
+Witness programs with a version of 9 shall be worth 8 points for every byte
+in the serialized witness vector (including the varint item count).
 
-Witness script hash v0 shall be worth the number of accurately counted sigops
-in the redeem script, multiplied by a factor of 8.
+Unknown witness programs shall be worth 1 point for every byte in the witness
+vector.
 
-Unknown witness programs shall be worth 1 point, multiplied by a factor of 1.
+#### Calculating Outputs Cost
 
-To reduce the chance of having redeem scripts which simply allow for garbage
-data in the witness vector, every 73 bytes in the serialized witness vector is
-worth 1 additional point.
+Witness programs with a version of 9 shall be worth 8 points for every byte
+in the output script (including the varint size prefix).
 
-This leaves room for 7 future soft-fork upgrades to relax DoS limits.
+Exiting outputs shall be worth 8 points for every byte in the output script.
+Note that this cost is not upgradeable.
 
-###### Calculating Outputs Cost
+Unknown witness programs shall be worth 1 point for every byte in output script.
 
-Currently defined witness programs (v0) are each worth 8 points. Unknown
-witness program outputs are worth 1 point. Any exiting output is always worth
-8 points.
+#### Calculating Sigops Cost
 
-This leaves room for 7 future soft-fork upgrades to relax DoS limits.
+Witness key hash v9 shall be worth 8 points.
+
+Witness script hash v9 shall be worth the number of accurately counted sigops
+(bip16 counting) in the redeem script, multiplied by a factor of 8.
 
 #### Dust Threshold
 
@@ -482,9 +492,8 @@ to achieve compatibility with extension blocks.
 
 1. Wallets must pick a chain to spend from when creating a transaction (either
    the canonical block or the extension block, but not both). In other words,
-   transactions must have all witness program inputs, or all non-witness program
-   inputs. For wallets that support both chains, the coin selector can
-   automatically pick which chain to use if the user does not specify.
+   transactions must have all witness program v9-v16 inputs, or all
+   non-extension inputs.
 
 2. Wallets supporting extension blocks must ignore inputs on
    resolution transactions if seen. This should be a simple check of transaction
@@ -565,6 +574,9 @@ database migration.
 - Start time: TBD
 - Timeout: TBD
 
+Because extblk depends on the segwit deployment, extblk rules must remain
+unenforced until `segwit` also reaches its active state.
+
 ### Deactivation
 
 Miners may vote on deactivation of the extension block via the 28th BIP9
@@ -598,7 +610,7 @@ hard-forking the code.
 A social contract is understood whereby the funds in the extension block will
 be usable and redeemable in the general deactivation design below. If proper
 and safe withdrawals are not activated within the terms, users and exchanges
-can refuse to acknolwedge blocks with the bit set as a soft-fork.
+can refuse to acknowledge blocks with the bit set as a soft-fork.
 
 It is possible to do a direct upgrade of the extension block by using the same
 output set upon BIP9 activation of the 28th bit in conjunction with new rules
@@ -650,7 +662,7 @@ blocks with many different rulesets.
 
 ## Reference Implementation (WIP)
 
-https://github.com/bcoin-org/bcoin-extension-blocks
+https://github.com/bcoin-org/bcoin-extension-blocks/tree/extblk-sw2
 
 ## Copyright
 
